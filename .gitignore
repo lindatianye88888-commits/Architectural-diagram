@@ -1,0 +1,11 @@
+# Local caches and workspace/editor state; never publish local credentials.
+cache/
+.workbuddy/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+*.log
+*.tmp
