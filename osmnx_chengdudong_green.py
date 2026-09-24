@@ -1,5 +1,10 @@
-"""成都东站步行 15/30 分钟内，OpenStreetMap 公园、游园和城市广场的可达性示意。"""
+"""车站步行 15/30 分钟内，OSM 候选绿地和城市广场可达性示意。
 
+默认运行成都东站；成都南站运行：
+    python osmnx_chengdudong_green.py --config data/chengdunan_crosscheck_config.json
+"""
+
+import argparse
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -15,6 +20,12 @@ from osmnx_chengdudong_30min import (
     BAND_WIDTH_M, LAT, LON, ROOT, SEARCH_RADIUS_M,
     WALK_SPEED_M_S, reachable_lines,
 )
+from osm_three_source_workflow import (
+    DEFAULT_CONFIG,
+    build_verified_graph,
+    load_config,
+    resolve_path,
+)
 
 
 TAGS = {
@@ -25,6 +36,8 @@ TAGS = {
 
 
 def space_type(item):
+    if item.get("access") in {"private", "no"}:
+        return None
     if item.get("place") == "square":
         return "square"
     if item.get("leisure") in {"park", "garden"}:
@@ -35,27 +48,30 @@ def space_type(item):
     return None
 
 
-def main():
+def build_accessibility(config_path=DEFAULT_CONFIG):
+    """Return the network-derived public-space data shared by static and web maps."""
+    config = load_config(config_path)
+    lat = float(config["center"]["lat"])
+    lon = float(config["center"]["lon"])
+    search_radius_m = float(config["search_radius_m"])
+    walk_speed_m_s = float(config.get("walk_speed_kmh", 4.8)) * 1000 / 3600
     print("读取步行路网、公园游园和广场记录……", flush=True)
-    graph = ox.project_graph(
-        ox.graph_from_point((LAT, LON), dist=SEARCH_RADIUS_M, network_type="walk")
-    )
+    graph, crosscheck = build_verified_graph(config_path)
+    graph.graph["crosscheck_applied"] = crosscheck["applied_count"]
     crs = graph.graph["crs"]
-    station = gpd.GeoSeries([Point(LON, LAT)], crs="EPSG:4326").to_crs(crs).iloc[0]
+    station = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326").to_crs(crs).iloc[0]
     nodes = list(graph.nodes)
     positions = np.asarray([(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in nodes])
     _, idx = cKDTree(positions).query([station.x, station.y])
     for _, _, edge in graph.edges(data=True):
-        edge["travel_time"] = edge["length"] / WALK_SPEED_M_S
+        edge["travel_time"] = edge["length"] / walk_speed_m_s
     times = nx.single_source_dijkstra_path_length(
         graph, nodes[idx], cutoff=1800, weight="travel_time"
     )
-    lines_15 = reachable_lines(graph, times, 900)
-    lines_30 = reachable_lines(graph, times, 1800)
-    roads_15 = gpd.GeoSeries([gpd.GeoSeries(lines_15, crs=crs).union_all()], crs=crs)
-    roads_30 = gpd.GeoSeries([gpd.GeoSeries(lines_30, crs=crs).union_all()], crs=crs)
+    lines_15 = reachable_lines(graph, times, 900, walk_speed_m_s=walk_speed_m_s)
+    lines_30 = reachable_lines(graph, times, 1800, walk_speed_m_s=walk_speed_m_s)
 
-    spaces = ox.features_from_point((LAT, LON), TAGS, dist=SEARCH_RADIUS_M)
+    spaces = ox.features_from_point((lat, lon), TAGS, dist=search_radius_m)
     spaces = spaces[spaces.geometry.notna() & ~spaces.geometry.is_empty].to_crs(crs).copy()
     spaces["kind"] = spaces.apply(space_type, axis=1)
     spaces = spaces[spaces.kind.notna()].copy()
@@ -74,7 +90,7 @@ def main():
         d = shapely.distance(reached_points, geom)
         valid = d <= 200  # 距设施边界超过 200 m 的路口不视为就近接入
         estimated_minutes.append(
-            float(np.min((reached_seconds[valid] + d[valid] / WALK_SPEED_M_S) / 60))
+            float(np.min((reached_seconds[valid] + d[valid] / walk_speed_m_s) / 60))
             if valid.any() else float("inf")
         )
     spaces["walk_min"] = estimated_minutes
@@ -82,6 +98,16 @@ def main():
         [spaces.walk_min <= 15, spaces.walk_min <= 30],
         ["15", "30"], default="outside"
     )
+    return graph, crs, station, lines_15, lines_30, spaces
+
+
+def main(config_path=DEFAULT_CONFIG):
+    config = load_config(config_path)
+    title = config.get("title", config["project_id"])
+    search_radius_m = float(config["search_radius_m"])
+    graph, crs, station, lines_15, lines_30, spaces = build_accessibility(config_path)
+    roads_15 = gpd.GeoSeries([gpd.GeoSeries(lines_15, crs=crs).union_all()], crs=crs)
+    roads_30 = gpd.GeoSeries([gpd.GeoSeries(lines_30, crs=crs).union_all()], crs=crs)
     green = spaces[spaces.kind == "green"]
     square = spaces[spaces.kind == "square"]
     for category, items in (("park_garden", green), ("square", square)):
@@ -124,7 +150,11 @@ def main():
                        color=colors[place.period], edgecolors="white", zorder=8)
 
     # 仅标注近邻且有名称的少数大型/较近绿地，避免与面状分布相互遮挡。
-    named = green[(green.period != "outside") & green.get("name").notna()]
+    named = (
+        green[(green.period != "outside") & green["name"].notna()]
+        if "name" in green.columns
+        else green.iloc[0:0]
+    )
     named = named.sort_values("walk_min").head(3)
     for _, park in named.iterrows():
         position = park.geometry.representative_point()
@@ -134,19 +164,19 @@ def main():
                     bbox=dict(facecolor="#F9FBFD", edgecolor="none", alpha=0.78, pad=1.0))
     ax.scatter(station.x, station.y, c="#223D59", s=140, marker="*",
                edgecolors="white", linewidth=1.15, zorder=11)
-    ax.annotate("成都东站", (station.x, station.y), xytext=(8, 8),
+    ax.annotate(title, (station.x, station.y), xytext=(8, 8),
                 textcoords="offset points", fontsize=12, color="#223D59",
                 weight="bold", zorder=12)
-    span = SEARCH_RADIUS_M * 1.04
+    span = search_radius_m * 1.04
     ax.set_xlim(station.x - span, station.x + span)
     ax.set_ylim(station.y - span, station.y + span)
     ax.set_aspect("equal")
     ax.axis("off")
 
-    fig.text(0.065, 0.955, "成都东站 · 绿地与公共空间可达图",
+    fig.text(0.065, 0.955, f"{title} · 绿地与公共空间可达图",
              fontsize=22, weight="bold", color="#213B52", va="top")
     fig.text(0.066, 0.913,
-             f"OpenStreetMap 公园／游园 {len(green)} 处、广场 {len(square)} 处  /  步行 15 与 30 分钟",
+             f"OSM 候选公园／游园 {len(green)} 处、广场 {len(square)} 处  /  步行 15 与 30 分钟",
              fontsize=10.5, color="#5D7181", va="top")
     handles = [
         Patch(facecolor=colors["15"], edgecolor="none",
@@ -167,13 +197,19 @@ def main():
              fontsize=8.5, color="#5D7181")
     fig.text(0.067, 0.076, "未核实实际入口、围墙及开放性；未把无准入记录的游乐场与普通草坪直接当作公共绿地。",
              fontsize=8.5, color="#5D7181")
-    fig.text(0.067, 0.051, "数据 © OpenStreetMap contributors  |  设施可能漏标  |  计算：OSMnx / NetworkX",
+    fig.text(0.067, 0.051,
+             f"数据 © OpenStreetMap contributors  |  三源核验修正 {graph.graph.get('crosscheck_applied', 0)} 条  |  设施可能漏标",
              fontsize=8.3, color="#788B9A")
-    output = ROOT / "chengdudong_green_access.png"
+    output = resolve_path(
+        config["paths"].get("green_png", f"{config['project_id']}_green_access.png")
+    )
     fig.savefig(output, dpi=180, facecolor=fig.get_facecolor())
     plt.close(fig)
     print(f"已保存：{output}", flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    args = parser.parse_args()
+    main(args.config)

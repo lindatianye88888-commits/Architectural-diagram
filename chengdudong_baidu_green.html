@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>成都东站 · 绿地与公共空间可达图（百度地图）</title>
+  <style>
+    :root { color-scheme: light; font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #e9f0ed; color: #19332d; }
+    .app { display: grid; grid-template-columns: minmax(320px, 370px) 1fr; min-height: 100vh; }
+    aside { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 20px; padding: 34px 30px 22px; background: #fbfdf9; box-shadow: 5px 0 24px #213c301a; }
+    .eyebrow { color: #2e8468; font-size: 11px; font-weight: 800; letter-spacing: .2em; }
+    h1 { font-size: 28px; letter-spacing: -.04em; margin: 10px 0 8px; line-height: 1.34; }
+    p { margin: 0; }
+    .lede { color: #657971; font-size: 13px; line-height: 1.75; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); border-block: 1px solid #dde7df; padding: 17px 0; gap: 8px; }
+    .metric strong { display: block; font-size: 25px; color: #21684e; font-weight: 750; }
+    .metric span { display: block; font-size: 11px; color: #64786e; line-height: 1.5; }
+    h2 { font-size: 13px; margin: 0 0 12px; }
+    .switches { display: grid; gap: 9px; }
+    label.toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
+    .toggle input { accent-color: #297e5b; width: 16px; height: 16px; margin: 0; }
+    .swatch { height: 10px; width: 20px; flex: none; border-radius: 5px; }
+    .divider { height: 1px; background: #e7ece7; margin: 5px 0; }
+    .key-box { padding: 16px; background: #eaf3ed; border-radius: 12px; }
+    .key-box h2 { margin-bottom: 8px; }
+    .key-box p { font-size: 11px; line-height: 1.7; color: #64786e; margin-bottom: 12px; }
+    .entry { display: flex; gap: 6px; }
+    .entry input { min-width: 0; flex: 1; border: 1px solid #cad9cd; border-radius: 8px; padding: 10px 11px; font: inherit; font-size: 12px; background: white; }
+    .entry button { border: 0; border-radius: 8px; padding: 0 13px; background: #21684e; color: white; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .entry button:disabled { opacity: .6; cursor: wait; }
+    #status { min-height: 33px; margin-top: 8px; font-size: 11px; color: #547364; line-height: 1.5; }
+    aside footer { margin-top: auto; color: #829189; font-size: 10px; line-height: 1.8; }
+    aside a { color: #21684e; }
+    .canvas { position: relative; min-height: 100vh; overflow: hidden; }
+    #map, #preview { position: absolute; inset: 0; }
+    #preview { z-index: 1; display: flex; align-items: center; justify-content: center; padding: 30px; background: #e9f0ed; }
+    #preview img { width: 100%; height: 100%; object-fit: contain; }
+    #preview .notice { position: absolute; left: 24px; bottom: 25px; right: 24px; max-width: 500px; padding: 12px 16px; border-radius: 10px; background: #fffef9ec; box-shadow: 0 5px 20px #183e3426; font-size: 12px; line-height: 1.6; }
+    .map-label { position: absolute; right: 20px; top: 20px; z-index: 1; background: #fffffff2; padding: 9px 12px; border-radius: 9px; font-size: 11px; color: #526a5e; box-shadow: 0 3px 12px #183e3420; }
+    @media (max-width: 780px) {
+      .app { grid-template-columns: 1fr; }
+      aside { padding: 22px; gap: 15px; }
+      h1 { font-size: 23px; }
+      .canvas { height: 70vh; min-height: 450px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <header>
+        <div class="eyebrow">URBAN ACCESS / CHENGDU EAST</div>
+        <h1>绿地与公共空间<br>步行可达图</h1>
+        <p class="lede">以成都东站为起点，沿 OSM 步行路网估算 15 / 30 分钟内可接近的公园、游园与广场。</p>
+      </header>
+      <div class="metrics">
+        <div class="metric"><strong id="count15">—</strong><span>15 分钟内绿地</span></div>
+        <div class="metric"><strong id="count30">—</strong><span>30 分钟内绿地（累计）</span></div>
+        <div class="metric"><strong id="countSquare">—</strong><span>30 分钟内广场</span></div>
+      </div>
+      <section>
+        <h2>图层开关</h2>
+        <div class="switches">
+          <label class="toggle"><input data-layer="green15" type="checkbox" checked><i class="swatch" style="background:#247e57"></i>15 分钟内绿地</label>
+          <label class="toggle"><input data-layer="green30" type="checkbox" checked><i class="swatch" style="background:#80bd92"></i>15–30 分钟绿地</label>
+          <label class="toggle"><input data-layer="square" type="checkbox" checked><i class="swatch" style="background:#686ab0"></i>广场</label>
+          <label class="toggle"><input data-layer="outside" type="checkbox"><i class="swatch" style="background:#bbc9ba"></i>其余有记录的绿地 / 广场</label>
+          <div class="divider"></div>
+          <label class="toggle"><input data-layer="road15" type="checkbox" checked><i class="swatch" style="background:#2d86b2"></i>15 分钟可达步行道路</label>
+          <label class="toggle"><input data-layer="road30" type="checkbox" checked><i class="swatch" style="background:#a4cbdc"></i>30 分钟可达步行道路</label>
+        </div>
+      </section>
+      <div class="key-box">
+        <h2>接入百度地图</h2>
+        <p>本机已配置 AK 时会自动接入；其他使用者也可以输入自己的浏览器端 AK。需联网，并将访问网页的域名或本地 IP 加入 Referer 白名单。</p>
+        <div class="entry"><input id="ak" type="password" autocomplete="off" placeholder="输入百度地图 AK" aria-label="百度地图 AK"><button id="connect" type="button">加载底图</button></div>
+      <div id="status" role="status" aria-live="polite">下方目前是原有静态图预览；接入后会切换为灰阶底图的可交互百度地图。</div>
+      </div>
+      <footer>步速 4.8 km/h；按最近可达路口到设施边界估算，未核实入口、围墙和开放性。“其余”不等于证实不可达。<br>数据 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a> · 底图联网后由百度地图提供。</footer>
+    </aside>
+    <main class="canvas">
+      <div id="map" aria-label="百度地图交互地图"></div>
+      <div id="preview"><img src="./chengdudong_green_access.png" alt="未接入 AK 时显示的原有成都东站绿地可达静态图"><div class="notice">静态图预览，不是百度底图。输入 AK 并成功加载后，这里会切换成可缩放、可点选设施的百度地图。</div></div>
+      <div class="map-label">数据：OSM 步行路网 · 底图：百度地图灰阶（需 AK）</div>
+    </main>
+  </div>
+  <script>
+    "use strict";
+    const DATA_URL = "./data/chengdudong_green_access_wgs84.json";
+    const status = document.getElementById("status");
+    const button = document.getElementById("connect");
+    const akInput = document.getElementById("ak");
+    const layers = { green15: [], green30: [], square: [], outside: [], road15: [], road30: [] };
+    let dataPromise;
+    let map;
+    let connected = false;
+    let attempted = false;
+
+    // Style the Baidu basemap itself, so the coloured accessibility overlays stay coloured.
+    // Inline style JSON works with each visitor's own AK (unlike an account-bound style ID).
+    const grayBasemapStyle = [
+      ...Object.entries({
+        land: "#f2f2f2ff", water: "#d4d4d4ff", green: "#e2e2e2ff",
+        manmade: "#e9e9e9ff", building: "#e8e8e8ff",
+        education: "#edededff", medical: "#e7e7e7ff",
+        scenicspots: "#e3e3e3ff", entertainment: "#e9e9e9ff", shopping: "#e6e6e6ff",
+        subwaystation: "#dededeff",
+      }).map(([featureType, color]) => ({ featureType, elementType: "geometry", stylers: { color } })),
+      ...["road", "highway", "arterial", "local", "railway", "subway"].flatMap(featureType => [
+        { featureType, elementType: "geometry.fill", stylers: { color: "#ffffffff" } },
+        { featureType, elementType: "geometry.stroke", stylers: { color: "#d0d0d0ff" } },
+      ]),
+      ...["road", "highway", "arterial", "local", "railway", "subway", "poilabel", "districtlabel", "city", "town", "subwaystation"].map(featureType =>
+        ({ featureType, elementType: "labels.text.fill", stylers: { color: "#696969ff" } })),
+      { featureType: "poilabel", elementType: "labels.icon", stylers: { visibility: "off" } },
+      { featureType: "subwaystation", elementType: "labels.icon", stylers: { visibility: "off" } },
+    ];
+
+    const setStatus = message => { status.textContent = message; };
+    const isChecked = key => document.querySelector(`[data-layer="${key}"]`).checked;
+    document.querySelectorAll("[data-layer]").forEach(input => {
+      input.addEventListener("change", () => {
+        for (const overlay of layers[input.dataset.layer]) {
+          if (input.checked) overlay.show(); else overlay.hide();
+        }
+      });
+    });
+
+    dataPromise = fetch(DATA_URL).then(response => {
+      if (!response.ok) throw new Error(`数据文件未找到（HTTP ${response.status}）`);
+      return response.json();
+    }).then(data => {
+      const greens = data.features.filter(f => f.properties.kind === "green");
+      document.getElementById("count15").textContent = greens.filter(f => f.properties.period === "15").length;
+      document.getElementById("count30").textContent = greens.filter(f => f.properties.period !== "outside").length;
+      document.getElementById("countSquare").textContent = data.features.filter(f => f.properties.kind === "square" && f.properties.period !== "outside").length;
+      return data;
+    });
+    dataPromise.catch(error => setStatus(`${error.message}。请从项目目录启动本地网页服务后再打开，而不是双击 HTML 文件。`));
+
+    const toPoint = pair => new BMap.Point(pair[0], pair[1]);
+    const add = (key, overlay) => {
+      layers[key].push(overlay);
+      map.addOverlay(overlay);
+      if (!isChecked(key)) overlay.hide();
+    };
+    const linePaths = geometry => geometry.type === "LineString" ? [geometry.coordinates] : geometry.coordinates;
+
+    async function drawRoads(data) {
+      const config = [
+        ["road30", data.roads["30"], "#a4cbdc", 4.5],
+        ["road15", data.roads["15"], "#2d86b2", 4.5],
+      ];
+      let drawn = 0;
+      for (const [key, geom, color, width] of config) {
+        for (const path of linePaths(geom)) {
+          if (path.length < 2) continue;
+          add(key, new BMap.Polyline(path.map(toPoint), {
+            coordType: "BMAP_COORD_WGS84", strokeColor: color, strokeWeight: width,
+            strokeOpacity: key === "road30" ? 0.65 : 0.84, enableClicking: false,
+          }));
+          if (++drawn % 70 === 0) {
+            setStatus(`正在叠加道路图层：${drawn} 段…`);
+            await new Promise(resolve => requestAnimationFrame(resolve));
+          }
+        }
+      }
+    }
+
+    function showInfo(feature) {
+      const props = feature.properties;
+      const box = document.createElement("div");
+      box.style.cssText = "font:13px/1.7 system-ui,sans-serif;color:#213c32;padding:4px 0";
+      const name = document.createElement("strong");
+      name.textContent = props.name;
+      const time = document.createElement("p");
+      time.textContent = props.walk_min === null
+        ? "30 分钟内未获得可达估算，不代表绝对无法进入。"
+        : `从成都东站估算步行约 ${props.walk_min} 分钟；实际入口可能不同。`;
+      box.append(name, time);
+      map.openInfoWindow(new BMap.InfoWindow(box), toPoint(props.point_wgs84));
+    }
+
+    function drawSpaces(data) {
+      const palette = { green15: "#247e57", green30: "#80bd92", square: "#686ab0", outside: "#bbc9ba" };
+      for (const feature of data.features) {
+        const props = feature.properties;
+        const key = props.period === "outside" ? "outside" : props.kind === "square" ? "square" : `green${props.period}`;
+        const color = palette[key];
+        const geometry = feature.geometry;
+        if (geometry.type === "Point") {
+          const dot = new BMap.Circle(toPoint(geometry.coordinates), 20, {
+            coordType: "BMAP_COORD_WGS84", strokeColor: "#ffffff", strokeWeight: 2,
+            fillColor: color, fillOpacity: 0.9,
+          });
+          dot.addEventListener("click", () => showInfo(feature));
+          add(key, dot);
+          continue;
+        }
+        const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+        for (const rings of polygons) {
+          const polygon = new BMap.Polygon(rings.map(ring => ring.map(toPoint)), {
+            coordType: "BMAP_COORD_WGS84", fillColor: color,
+            fillOpacity: key === "outside" ? 0.24 : 0.72,
+            strokeColor: color, strokeWeight: 1.3,
+          });
+          polygon.addEventListener("click", () => showInfo(feature));
+          add(key, polygon);
+        }
+      }
+    }
+
+    async function connect() {
+      if (connected) return;
+      if (attempted) { window.location.reload(); return; }
+      const ak = akInput.value.trim();
+      if (!ak) { setStatus("请先输入你自己的浏览器端 AK。"); return; }
+      attempted = true;
+      button.textContent = "刷新重试";
+      try {
+        const data = await dataPromise;
+        setStatus("正在连接百度地图…");
+        const script = document.createElement("script");
+        script.src = `https://api.map.baidu.com/api?v=4.0&ak=${encodeURIComponent(ak)}&callback=__baiduGreenReady`;
+        await new Promise((resolve, reject) => {
+          window.__baiduGreenReady = () => { delete window.__baiduGreenReady; resolve(); };
+          script.onerror = () => reject(new Error("百度 JS API 未加载：请检查网络与 AK。"));
+          document.head.append(script);
+        });
+        if (!window.BMap?.Map) throw new Error("百度地图初始化失败，请检查浏览器端 AK 和 Referer 白名单。");
+        BMap.coordType = BMAP_COORD_WGS84;
+        map = new BMap.Map("map");
+        const firstTile = new Promise(resolve => map.addEventListener("firsttileload", resolve));
+        map.centerAndZoom(toPoint(data.station), 13);
+        map.setMapStyle({ styleJson: grayBasemapStyle });
+        map.enableScrollWheelZoom(true);
+        await drawRoads(data);
+        drawSpaces(data);
+        const station = new BMap.Marker(toPoint(data.station), {
+          coordType: "BMAP_COORD_WGS84", title: "成都东站（分析起点）", isTop: true,
+        });
+        map.addOverlay(station);
+        document.getElementById("preview").hidden = true;
+        document.getElementById("preview").style.display = "none";
+        setStatus("分析图层已叠加，正在等待百度底图加载（不设时间限制）。若持续空白，请检查 AK 权限和 Referer，或点“刷新重试”。");
+        await firstTile;
+        connected = true;
+        button.textContent = "已连接";
+        setStatus("百度底图与交互图层已加载。点击绿地或广场查看估算时间。");
+      } catch (error) {
+        setStatus(`无法加载交互地图：${error.message}`);
+      } finally {
+        button.disabled = connected;
+      }
+    }
+    button.addEventListener("click", connect);
+    akInput.addEventListener("keydown", event => { if (event.key === "Enter") connect(); });
+    // Optional local-only configuration. This file is gitignored: forks use
+    // their own AK and the public HTML never embeds its owner's key.
+    fetch("./baidu-map.local.json", { cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(config => {
+        if (config && typeof config.ak === "string" && config.ak.trim()) {
+          akInput.value = config.ak.trim();
+          connect();
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

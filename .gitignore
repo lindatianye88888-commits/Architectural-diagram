@@ -1,5 +1,7 @@
 # Local caches and workspace/editor state; never publish local credentials.
 cache/
+data/osm/
+data/results/
 .workbuddy/
 __pycache__/
 *.py[cod]
@@ -7,5 +9,6 @@ __pycache__/
 venv/
 .env
 .env.*
+baidu-map.local.json
 *.log
 *.tmp

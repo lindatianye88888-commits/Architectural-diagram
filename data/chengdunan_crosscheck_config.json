@@ -1,0 +1,22 @@
+{
+  "project_id": "chengdunan",
+  "title": "成都南站",
+  "center": {
+    "lat": 30.6082704,
+    "lon": 104.0660435
+  },
+  "network_type": "walk",
+  "search_radius_m": 3000,
+  "walk_speed_kmh": 4.8,
+  "analysis_minutes": [15, 30],
+  "snap_tolerance_m": 60,
+  "paths": {
+    "raw_graph": "data/osm/chengdunan_walk_raw.graphml",
+    "verified_graph": "data/osm/chengdunan_walk_verified.graphml",
+    "observations": "data/review/chengdunan_observations.geojson",
+    "audit_json": "data/results/chengdunan_crosscheck_audit.json",
+    "comparison_png": "chengdunan_crosscheck.png",
+    "analysis_png": "chengdunan_30min.png",
+    "green_png": "chengdunan_green_access.png"
+  }
+}
