@@ -1,5 +1,7 @@
 # Architectural diagram · OSMnx 地图与分析图
 
+**署名：梅梅的AI景观实验室**
+
 使用 [OSMnx](https://github.com/gboeing/osmnx) 从 OpenStreetMap 数据制作的建筑、景观与城市空间分析示例。这里保存的是本地绘图脚本及其已生成的静态图片，**不是 OSMnx 上游项目的 GitHub Fork**，也不是无需设置即可批量出图的通用软件。
 
 ## 开始使用
